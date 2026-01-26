@@ -1,0 +1,2 @@
+CREATE DATABASE IF NOT EXISTS XRail_db;
+USE XRail_db;

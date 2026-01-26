@@ -1,0 +1,100 @@
+services:
+  # ==========================================
+  # 1. Database (MySQL 8.0)
+  # ==========================================
+  mysql:
+    image: mysql:8.0
+    container_name: ${PROJECT_NAME}-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Seoul
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./docker/mysql/data:/var/lib/mysql               # 데이터 영구 저장
+      - ./docker/mysql/conf/my.cnf:/etc/mysql/conf.d/my.cnf # 튜닝 설정 적용
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d  # 초기화 스크립트
+    networks:
+      - XRail-net
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 2. Cache & Lock (Redis)
+  # ==========================================
+  redis:
+    image: redis:alpine
+    container_name: ${PROJECT_NAME}-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes  # 데이터 영구 저장(AOF) 켬
+    volumes:
+      - ./docker/redis/data:/data
+    networks:
+      - XRail-net
+
+  # ==========================================
+  # 3. Message Queue (Kafka + Zookeeper)
+  # ==========================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: ${PROJECT_NAME}-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - XRail-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: ${PROJECT_NAME}-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - XRail-net
+
+  # ==========================================
+  # 4. Application (Spring Boot)
+  # ==========================================
+  # 개발 중에는 IDE에서 실행하는 경우가 많으므로, 필요할 때 주석 해제하여 사용
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/app/Dockerfile
+  #   container_name: ${PROJECT_NAME}-app
+  #   ports:
+  #     - "8088:8080"
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_started
+  #     kafka:
+  #       condition: service_started
+  #   environment:
+  #     SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true
+  #     SPRING_REDIS_HOST: redis
+  #     SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+  #   networks:
+  #     - XRail-net
+
+networks:
+  XRail-net:
+    driver: bridge
