@@ -58,8 +58,8 @@ dependencies {
 	implementation 'org.redisson:redisson-spring-boot-starter:3.31.0'
 
 	// [Manual Add] 6. QueryDSL (Jakarta EE 호환)
-	implementation 'com.querydsl:querydsl-jpa:8.2.0:jakarta'
-	annotationProcessor "com.querydsl:querydsl-apt:8.2.0:jakarta"
+	implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
+	annotationProcessor "com.querydsl:querydsl-apt:5.1.0:jakarta"
 	annotationProcessor "jakarta.annotation:jakarta.annotation-api"
 	annotationProcessor "jakarta.persistence:jakarta.persistence-api"
 
