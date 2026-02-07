@@ -5,6 +5,7 @@ import com.dev.XRail.domain.station.entity.Route;
 import com.dev.XRail.domain.train.entity.Train;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -42,6 +43,7 @@ public class Schedule extends BaseTimeEntity {
     @Column(name = "arrival_time", nullable = false)
     private LocalTime arrivalTime;
 
+    @Builder
     public Schedule(Route route, Train train, LocalDate departureDate, LocalTime departureTime, LocalTime arrivalTime) {
         this.route = route;
         this.train = train;

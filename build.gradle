@@ -4,7 +4,7 @@ plugins {
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
-group = 'com.xrail'
+group = 'com.XRail'
 version = '0.0.1-SNAPSHOT'
 
 java {
@@ -70,6 +70,10 @@ dependencies {
 
 	// [Manual Add] 8. JSON Utils
 	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+	// [Manual Add] 9. Rate Limiting (Bucket4j)
+	implementation 'com.bucket4j:bucket4j-core:8.10.1'
+	implementation 'com.bucket4j:bucket4j-redis:8.10.1'
 }
 
 // QueryDSL Build Options (Gradle 8.x 호환)
@@ -85,4 +89,9 @@ tasks.withType(JavaCompile) {
 
 clean.doLast {
 	file(querydslDir).deleteDir()
+}
+
+
+tasks.named('test') {
+	useJUnitPlatform()
 }

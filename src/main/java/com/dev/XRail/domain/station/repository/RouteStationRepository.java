@@ -15,6 +15,13 @@ public interface RouteStationRepository extends JpaRepository<RouteStation, Long
             @Param("routeId") Long routeId,
             @Param("stationName") String stationName
     );
+    
+    // 추가: ID 기반 조회
+    @Query("SELECT rs FROM RouteStation rs WHERE rs.route.id = :routeId AND rs.station.id = :stationId")
+    Optional<RouteStation> findByRouteIdAndStationId(
+            @Param("routeId") Long routeId,
+            @Param("stationId") Long stationId
+    );
 
     // 노선 ID와 역 ID로 순서(Index) 조회
     @Query("SELECT rs.stationSequence FROM RouteStation rs " +
@@ -23,4 +30,7 @@ public interface RouteStationRepository extends JpaRepository<RouteStation, Long
             @Param("routeId") Long routeId,
             @Param("stationId") Long stationId
     );
+
+    @Query("SELECT rs FROM RouteStation rs WHERE rs.route.id = :routeId ORDER BY rs.stationSequence ASC")
+    java.util.List<RouteStation> findByRouteIdOrderByStationSequenceAsc(@Param("routeId") Long routeId);
 }

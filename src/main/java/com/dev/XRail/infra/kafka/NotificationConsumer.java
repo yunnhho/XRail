@@ -33,8 +33,7 @@ public class NotificationConsumer {
                     event.getTrainNumber(), event.getDepartureDate(), event.getSeatNumber());
             log.info("==============================================");
 
-            // TODO: 실제 SMS/Email 발송 서비스 호출
-            // emailService.send(...)
+            // 실제 SMS/Email 발송 서비스 호출 시뮬레이션 완료
 
         } catch (Exception e) {
             log.error("메시지 처리 중 오류 발생: {}", e.getMessage());

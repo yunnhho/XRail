@@ -2,6 +2,7 @@ package com.dev.XRail.domain.train.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -32,6 +33,7 @@ public class Carriage {
     @OneToMany(mappedBy = "carriage", cascade = CascadeType.ALL)
     private List<Seat> seats = new ArrayList<>();
 
+    @Builder
     public Carriage(Train train, Integer carriageNumber, Integer seatCount) {
         this.train = train;
         this.carriageNumber = carriageNumber;

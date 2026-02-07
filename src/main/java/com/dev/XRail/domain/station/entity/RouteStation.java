@@ -3,6 +3,7 @@ package com.dev.XRail.domain.station.entity;
 import com.dev.XRail.common.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -33,6 +34,7 @@ public class RouteStation extends BaseTimeEntity {
     @Column(name = "cumulative_distance", nullable = false)
     private Double cumulativeDistance; // 기점으로부터의 거리 (km) - 요금 계산용
 
+    @Builder
     public RouteStation(Route route, Station station, Integer stationSequence, Double cumulativeDistance) {
         this.route = route;
         this.station = station;

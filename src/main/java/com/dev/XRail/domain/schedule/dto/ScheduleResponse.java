@@ -17,6 +17,10 @@ public class ScheduleResponse {
     private LocalDate departureDate;
     private LocalTime departureTime;
     private LocalTime arrivalTime;
+    private Long price; // 운임 요금
+    
+    @com.fasterxml.jackson.annotation.JsonProperty("isSoldOut")
+    private boolean isSoldOut; // 매진 여부
 
     public static ScheduleResponse from(Schedule schedule) {
         return ScheduleResponse.builder()
@@ -27,6 +31,20 @@ public class ScheduleResponse {
                 .departureDate(schedule.getDepartureDate())
                 .departureTime(schedule.getDepartureTime())
                 .arrivalTime(schedule.getArrivalTime())
+                .price(0L) // 기본값, 서비스에서 계산 후 주입
+                .isSoldOut(false) // 기본값
                 .build();
+    }
+    
+    public void setPrice(Long price) {
+        this.price = price;
+    }
+
+    public void setArrivalTime(LocalTime arrivalTime) {
+        this.arrivalTime = arrivalTime;
+    }
+
+    public void setSoldOut(boolean soldOut) {
+        isSoldOut = soldOut;
     }
 }

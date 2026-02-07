@@ -21,17 +21,16 @@ public class ScheduleController {
 
     private final ScheduleService scheduleService;
 
-    // 예: GET /api/schedules?routeId=1&date=2025-01-01&time=09:00
     @GetMapping
     public ApiResponse<List<ScheduleResponse>> getSchedules(
-            @RequestParam Long routeId,
+            @RequestParam Long departureStationId,
+            @RequestParam Long arrivalStationId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime time
     ) {
-        // 시간 미입력 시 00:00부터 조회
         if (time == null) time = LocalTime.MIN;
 
-        List<ScheduleResponse> result = scheduleService.searchSchedules(routeId, date, time);
+        List<ScheduleResponse> result = scheduleService.searchSchedules(departureStationId, arrivalStationId, date, time);
         return ApiResponse.success(result);
     }
 }

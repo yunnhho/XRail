@@ -53,4 +53,8 @@ public class Member extends User {
         this.socialProvider = socialProvider != null ? socialProvider : SocialProvider.NONE;
         this.socialId = socialId;
     }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
 }

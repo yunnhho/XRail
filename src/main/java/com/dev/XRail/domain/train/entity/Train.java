@@ -3,6 +3,7 @@ package com.dev.XRail.domain.train.entity;
 import com.dev.XRail.common.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -30,6 +31,7 @@ public class Train extends BaseTimeEntity {
     @OneToMany(mappedBy = "train", cascade = CascadeType.ALL)
     private List<Carriage> carriages = new ArrayList<>(); // 1호차, 2호차...
 
+    @Builder
     public Train(String trainNumber, TrainType trainType) {
         this.trainNumber = trainNumber;
         this.trainType = trainType;

@@ -156,6 +156,7 @@ CREATE TABLE tickets (
     start_station_idx INT NOT NULL, -- 구간 시작 인덱스
     end_station_idx   INT NOT NULL, -- 구간 종료 인덱스
     price             BIGINT NOT NULL,
+    status            VARCHAR(20) NOT NULL,
     created_at        DATETIME(6),
     updated_at        DATETIME(6),
     CONSTRAINT fk_tickets_reservation FOREIGN KEY (reservation_id) REFERENCES reservations (reservation_id),

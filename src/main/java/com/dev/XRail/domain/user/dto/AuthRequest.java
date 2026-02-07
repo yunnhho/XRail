@@ -13,6 +13,9 @@ public class AuthRequest {
         private String loginId;
         @NotBlank(message = "비밀번호를 입력해주세요.")
         private String password;
+
+        @com.dev.XRail.common.annotation.Honeypot
+        private String _hidden_check;
     }
 
     @Getter @Setter
@@ -23,14 +26,24 @@ public class AuthRequest {
         @NotBlank private String phone;
         @NotBlank private String email;
         private String birthDate;
+
+        @com.dev.XRail.common.annotation.Honeypot
+        private String _hidden_check;
     }
 
     @Getter @Setter
-    public static class NonMemberLogin {
+    public static class GuestRegister {
         @NotBlank private String name;
-        @NotBlank(message = "발권 시 부여받은 임시 비밀번호 4자리")
-        private String password; // 4자리 숫자
-        @NotBlank(message = "발권 시 부여받은 예매 번호")
+        @NotBlank private String phone;
+        @NotBlank(message = "비밀번호 6자리를 입력해주세요.")
+        private String password;
+    }
+
+    @Getter @Setter
+    public static class GuestLogin {
+        @NotBlank(message = "예매번호(Access Code)를 입력해주세요.")
         private String accessCode;
+        @NotBlank(message = "비밀번호 6자리를 입력해주세요.")
+        private String password;
     }
 }

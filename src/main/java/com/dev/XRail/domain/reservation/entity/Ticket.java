@@ -57,6 +57,14 @@ public class Ticket extends BaseTimeEntity {
     @Column(nullable = false)
     private Long price; // 개별 티켓 가격
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private TicketStatus status;
+
+    public void setReservation(Reservation reservation) {
+        this.reservation = reservation;
+    }
+
     @Builder
     public Ticket(Reservation reservation, Schedule schedule, Seat seat,
                   Station startStation, Station endStation,
@@ -69,5 +77,12 @@ public class Ticket extends BaseTimeEntity {
         this.startStationIdx = startStationIdx;
         this.endStationIdx = endStationIdx;
         this.price = price;
+        this.status = TicketStatus.RESERVED;
+    }
+
+    public enum TicketStatus {
+        RESERVED,  // 예약됨 (유효)
+        CANCELLED, // 취소됨 (무효)
+        USED       // 사용됨
     }
 }

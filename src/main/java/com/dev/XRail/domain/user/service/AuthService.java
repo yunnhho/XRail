@@ -4,7 +4,9 @@ import com.dev.XRail.common.dto.TokenResponse;
 import com.dev.XRail.domain.user.dto.AuthRequest;
 import com.dev.XRail.domain.user.entity.Member;
 import com.dev.XRail.domain.user.entity.NonMember;
+import com.dev.XRail.domain.user.entity.UserRole;
 import com.dev.XRail.domain.user.repository.MemberRepository;
+import com.dev.XRail.domain.user.repository.NonMemberRepository;
 import com.dev.XRail.domain.user.repository.UserRepository;
 import com.dev.XRail.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.UUID;
 
 @Service
 @Transactional(readOnly = true)
@@ -25,9 +28,9 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final MemberRepository memberRepository;
+    private final NonMemberRepository nonMemberRepository; // 추가
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
-    // AuthenticationManagerBuilder는 Spring Security의 정석적인 로그인 처리를 위해 사용
     private final AuthenticationManagerBuilder authenticationManagerBuilder;
 
     // [회원가입]
@@ -39,7 +42,7 @@ public class AuthService {
 
         Member member = Member.builder()
                 .loginId(dto.getLoginId())
-                .password(passwordEncoder.encode(dto.getPassword())) // 암호화 필수
+                .password(passwordEncoder.encode(dto.getPassword()))
                 .name(dto.getName())
                 .email(dto.getEmail())
                 .phone(dto.getPhone())
@@ -52,15 +55,57 @@ public class AuthService {
     // [회원 로그인]
     @Transactional
     public TokenResponse login(AuthRequest.Login dto) {
-        // 1. Login ID/PW 기반으로 AuthenticationToken 생성
         UsernamePasswordAuthenticationToken authenticationToken =
                 new UsernamePasswordAuthenticationToken(dto.getLoginId(), dto.getPassword());
 
-        // 2. 실제 검증 (사용자 비밀번호 체크)
-        // CustomUserDetailsService가 필요하지만, 일단 약식으로 진행 (원리 동일)
         Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
 
-        // 3. 인증 정보를 기반으로 JWT 토큰 생성
+        return jwtTokenProvider.generateToken(authentication);
+    }
+
+    // [비회원 예매 시작 (등록)]
+    @Transactional
+    public TokenResponse registerGuest(AuthRequest.GuestRegister dto) {
+        String accessCode = UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
+
+        // 비회원 비밀번호도 암호화하여 저장
+        NonMember nonMember = NonMember.builder()
+                .name(dto.getName())
+                .phone(dto.getPhone())
+                .password(passwordEncoder.encode(dto.getPassword()))
+                .accessCode(accessCode)
+                .build();
+        
+        nonMemberRepository.save(nonMember);
+
+        // JWT 발급을 위한 Authentication 객체 수동 생성
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                accessCode, // Principal (여기선 AccessCode를 ID로 사용)
+                null, 
+                Collections.singleton(new SimpleGrantedAuthority("ROLE_" + UserRole.NON_MEMBER.name()))
+        );
+
+        TokenResponse tokenResponse = jwtTokenProvider.generateToken(authentication);
+        tokenResponse.setAccessCode(accessCode); // TokenResponse에 setter나 필드 추가 필요
+        return tokenResponse;
+    }
+
+    // [비회원 조회 (로그인)]
+    @Transactional
+    public TokenResponse loginGuest(AuthRequest.GuestLogin dto) {
+        NonMember nonMember = nonMemberRepository.findByAccessCode(dto.getAccessCode())
+                .orElseThrow(() -> new RuntimeException("존재하지 않는 예매번호입니다."));
+
+        if (!passwordEncoder.matches(dto.getPassword(), nonMember.getPassword())) {
+            throw new RuntimeException("비밀번호가 일치하지 않습니다.");
+        }
+
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                nonMember.getAccessCode(),
+                null,
+                Collections.singleton(new SimpleGrantedAuthority("ROLE_" + UserRole.NON_MEMBER.name()))
+        );
+
         return jwtTokenProvider.generateToken(authentication);
     }
 }

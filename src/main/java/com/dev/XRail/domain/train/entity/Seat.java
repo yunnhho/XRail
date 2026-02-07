@@ -2,12 +2,15 @@ package com.dev.XRail.domain.train.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@Table(name = "seats") // 물리적 좌석 마스터
+@Table(name = "seats", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_seat_carriage_number", columnNames = {"carriage_id", "seat_number"})
+})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Seat {
 
@@ -23,6 +26,7 @@ public class Seat {
     @Column(name = "seat_number", nullable = false, length = 5)
     private String seatNumber; // 1A, 1B, 2C...
 
+    @Builder
     public Seat(Carriage carriage, String seatNumber) {
         this.carriage = carriage;
         this.seatNumber = seatNumber;

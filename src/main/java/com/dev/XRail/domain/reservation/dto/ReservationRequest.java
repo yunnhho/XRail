@@ -1,18 +1,29 @@
 package com.dev.XRail.domain.reservation.dto;
 
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
-import lombok.Setter;
+import lombok.NoArgsConstructor;
 
-@Getter @Setter
+import java.util.List;
+
+@Getter
+@NoArgsConstructor
 public class ReservationRequest {
+    @NotNull
     private Long scheduleId;
-    private Long seatId;
+
+    @NotEmpty
+    private List<Long> seatIds;
+
+    @NotNull
     private Long startStationId;
+
+    @NotNull
     private Long endStationId;
 
-    // 프론트엔드 혹은 역 정보 조회 후 계산된 인덱스
     private Integer startStationIdx;
     private Integer endStationIdx;
-
+    
     private Long price;
 }

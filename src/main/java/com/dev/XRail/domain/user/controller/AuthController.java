@@ -29,4 +29,16 @@ public class AuthController {
     public ResponseEntity<TokenResponse> login(@RequestBody @Valid AuthRequest.Login request) {
         return ResponseEntity.ok(authService.login(request));
     }
+
+    // 비회원 예매 시작 (등록)
+    @PostMapping("/guest/register")
+    public ResponseEntity<TokenResponse> registerGuest(@RequestBody @Valid AuthRequest.GuestRegister request) {
+        return ResponseEntity.ok(authService.registerGuest(request));
+    }
+
+    // 비회원 조회 (로그인)
+    @PostMapping("/guest/login")
+    public ResponseEntity<TokenResponse> loginGuest(@RequestBody @Valid AuthRequest.GuestLogin request) {
+        return ResponseEntity.ok(authService.loginGuest(request));
+    }
 }
