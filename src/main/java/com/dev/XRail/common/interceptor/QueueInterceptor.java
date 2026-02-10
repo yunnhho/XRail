@@ -23,7 +23,6 @@ public class QueueInterceptor implements HandlerInterceptor {
     private final NonMemberRepository nonMemberRepository;
 
     @Override
-
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if (request.getMethod().equals("OPTIONS")) {
             return true;

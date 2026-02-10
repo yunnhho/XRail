@@ -43,7 +43,6 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("errorCode", "TOO_MANY_REQUESTS");
             errorResponse.put("message", "요청 횟수가 너무 많습니다. 잠시 후 다시 시도해주세요.");
-
             response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
             return false;
         }

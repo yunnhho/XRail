@@ -28,7 +28,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final MemberRepository memberRepository;
-    private final NonMemberRepository nonMemberRepository; // 추가
+    private final NonMemberRepository nonMemberRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManagerBuilder authenticationManagerBuilder;

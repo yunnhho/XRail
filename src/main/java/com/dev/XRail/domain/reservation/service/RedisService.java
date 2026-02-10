@@ -24,6 +24,8 @@ public class RedisService {
     @Resource(name = "rollbackScript")
     private RedisScript<Long> rollbackScript;
 
+    private static final String SEAT_RESERVATION_TTL = "300"; // 5분
+
     /**
      * 좌석 점유 시도 (Atomic)
      * @return 성공 시 true
@@ -38,7 +40,7 @@ public class RedisService {
                 reservationScript,
                 Collections.singletonList(key), // KEYS[1]
                 String.valueOf(mask),           // ARGV[1]
-                "300"                           // ARGV[2]: TTL
+                SEAT_RESERVATION_TTL            // ARGV[2]: TTL
         );
 
         return result != null && result == 1L;

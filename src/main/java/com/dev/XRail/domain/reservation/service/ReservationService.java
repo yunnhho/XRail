@@ -68,8 +68,13 @@ public class ReservationService {
         List<Ticket> tickets = new ArrayList<>();
         List<Long> acquiredSeatIds = new ArrayList<>(); // 롤백용
 
+        // [Deadlock Prevention] 좌석 ID 오름차순 정렬하여 교착 상태 방지
+        List<Long> sortedSeatIds = request.getSeatIds().stream()
+                .sorted()
+                .toList();
+
         try {
-            for (Long seatId : request.getSeatIds()) {
+            for (Long seatId : sortedSeatIds) {
                 // 1. Redis Bitmasking 선점 (Atomic) - 내부적으로 startIdx, endIdx 사용
                 boolean isAcquired = redisService.acquireSeat(
                         schedule.getId(), seatId, startIdx, endIdx);
@@ -106,12 +111,10 @@ public class ReservationService {
                     .totalPrice(request.getPrice())
                     .reservedAt(LocalDateTime.now())
                     .build();
-            
             for (Ticket t : tickets) {
                 t.setReservation(reservation);
                 reservation.getTickets().add(t);
             }
-            
             return reservationRepository.save(reservation).getId();
 
         } catch (Exception e) {

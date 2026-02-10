@@ -71,12 +71,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     private Member createMember(OAuth2UserInfo userInfo, SocialProvider provider) {
         String uuid = UUID.randomUUID().toString().substring(0, 8);
         String loginId = provider.name().toLowerCase() + "_" + userInfo.getProviderId();
-        // If email is null (e.g. user didn't agree), use a dummy email to satisfy DB constraint
         String email = userInfo.getEmail() != null ? userInfo.getEmail() : loginId + "@social.dummy"; 
         
         return memberRepository.save(Member.builder()
                 .loginId(loginId)
-                .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Dummy password
+                .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                 .name(userInfo.getName() != null ? userInfo.getName() : "User_" + uuid)
                 .email(email)
                 .socialProvider(provider)
