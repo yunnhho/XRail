@@ -16,6 +16,124 @@ XRail은 고속열차 예매 시나리오를 바탕으로 만든 예약 시스�
 구현은 Spring Boot 기반의 모듈형 모놀리식 구조로 되어 있으며, 프론트엔드는 React + Vite로 분리되어 있습니다.  
 회원 로그인, 비회원 예매, 예약 결제, 예약 조회, 관리자 통계 조회까지 기본 흐름을 한 저장소 안에서 확인할 수 있습니다.
 
+## 백엔드 아키텍처
+
+현재 백엔드는 하나의 Spring Boot 애플리케이션 안에서 도메인별 패키지를 나눈 모듈형 모놀리식 구조입니다.  
+예약 로직은 `domain.reservation`, 검색은 `domain.schedule`, 사용자 인증은 `domain.user`, 대기열은 `domain.queue`, 공통 인터셉터와 예외 처리는 `common` 패키지에 모여 있습니다.
+
+```mermaid
+graph TD
+    Client[React Client] --> API[Spring Boot API]
+    API --> Security[Spring Security / JWT / OAuth2]
+    API --> RateLimit[RateLimit Interceptor]
+    API --> Queue[Queue Interceptor / Waiting Queue]
+
+    subgraph Application
+        API --> ScheduleService[Schedule Service]
+        API --> SeatService[Seat Service]
+        API --> ReservationService[Reservation Service]
+        API --> AuthService[Auth Service]
+        API --> AdminService[Admin Queries]
+    end
+
+    subgraph Persistence
+        ScheduleService --> MySQL[(MySQL)]
+        SeatService --> MySQL
+        ReservationService --> MySQL
+        AuthService --> MySQL
+    end
+
+    subgraph Concurrency
+        SeatService --> Redis[(Redis)]
+        ReservationService --> Redis
+        Queue --> Redis
+        RateLimit --> Redis
+    end
+
+    subgraph Async_And_Jobs
+        ReservationService --> Scheduler[Reservation / Reconciliation Scheduler]
+        ReservationService -. optional event flow .-> Kafka[(Kafka)]
+    end
+```
+
+백엔드에서 중요한 지점은 두 군데입니다.
+
+- 요청 진입부에서는 Rate Limit과 대기열 인터셉터가 먼저 동작합니다.
+- 예약 처리부에서는 Redis 선점과 DB 저장을 함께 써서 좌석 중복을 막습니다.
+
+## 데이터 플로우
+
+### 1. 열차 조회
+
+사용자가 출발역, 도착역, 날짜를 선택하면 스케줄 검색 API가 노선 순서를 기준으로 가능한 열차를 조회합니다.  
+응답에는 열차 정보, 출발/도착 시각, 계산된 요금, 매진 여부가 포함됩니다.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as Frontend
+    participant B as Schedule API
+    participant DB as MySQL
+
+    U->>F: 출발역 / 도착역 / 날짜 입력
+    F->>B: 스케줄 조회 요청
+    B->>DB: 가능한 스케줄 조회
+    DB-->>B: 스케줄 목록 반환
+    B-->>F: 가격 / 매진 여부 포함 응답
+```
+
+### 2. 좌석 조회와 선점
+
+좌석 조회 단계에서는 DB에 저장된 확정 좌석과 Redis에 남아 있는 임시 선점 좌석을 함께 봅니다.  
+예약 요청이 들어오면 Redis Lua 스크립트로 먼저 구간 점유를 시도하고, 성공한 좌석만 DB 저장 단계로 넘어갑니다.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as Frontend
+    participant B as Reservation API
+    participant R as Redis
+    participant DB as MySQL
+
+    U->>F: 좌석 선택
+    F->>B: 예약 요청
+    B->>R: 구간 비트마스크 선점 시도
+    R-->>B: 선점 성공 또는 실패
+    alt 선점 성공
+        B->>DB: 중복 검증 후 예약 / 티켓 저장
+        DB-->>B: PENDING 예약 생성
+        B-->>F: reservationId 반환
+    else 선점 실패
+        B-->>F: 이미 점유된 좌석 응답
+    end
+```
+
+### 3. 결제와 후속 처리
+
+결제 요청이 들어오면 예약 상태를 `PAID`로 바꾸고, 비회원이면 Access Code를 함께 반환합니다.  
+결제가 끝나지 않은 예약은 스케줄러가 정리하고, Redis와 DB 상태가 어긋나면 재대조 스케줄러가 보정합니다.
+
+```mermaid
+sequenceDiagram
+    participant F as Frontend
+    participant B as Payment API
+    participant DB as MySQL
+    participant S as Scheduler
+    participant R as Redis
+
+    F->>B: 결제 요청
+    B->>DB: 예약 상태를 PAID로 변경
+    DB-->>B: 결제 완료
+    B-->>F: 결과 응답
+
+    Note over S,DB: 20분 이상 PENDING 예약 취소
+    S->>DB: 만료 예약 조회 및 CANCELLED 처리
+
+    Note over S,R: Redis / DB 좌석 상태 재대조
+    S->>DB: 유효 티켓 조회
+    S->>R: 좌석 비트 상태 비교 및 보정
+```
+
 ## 문서 안내
 
 - `README.md`: 프로젝트 개요와 실행 방법
