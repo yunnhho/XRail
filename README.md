@@ -1,152 +1,160 @@
-# 🚄 XRail: 고속열차 예매 시스템 (High-Concurrency Train Reservation)
+# XRail
 
-![Project Status](https://img.shields.io/badge/Status-Completed-success)
 ![Java](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.12-brightgreen)
 ![React](https://img.shields.io/badge/React-19-blue)
 ![Redis](https://img.shields.io/badge/Redis-Concurrency%20Control-red)
 
-## 📖 프로젝트 개요
-**XRail**은 대용량 트래픽 환경에서도 데이터 무결성을 보장하며 안정적인 예매 서비스를 제공하는 **고성능 철도 예매 플랫폼**입니다.
-실제 코레일(Korail) 시스템을 벤치마킹하여 **구간 예매(Segment Booking)**, **동시성 제어**, **대기열 시스템** 등 복잡한 비즈니스 로직을 완벽하게 구현했습니다.
+XRail은 고속열차 예매 시나리오를 바탕으로 만든 예약 시스템 프로젝트입니다.  
+좌석 선점, 구간 예매, 대기열, 비회원 조회, 관리자 조회 화면처럼 실제 서비스에서 문제가 되기 쉬운 흐름을 중심으로 구성했습니다.
 
----
+## 프로젝트 개요
 
-## 🏗 시스템 아키텍처 및 기술 스택
+이 저장소의 핵심 주제는 "동시에 많은 요청이 들어와도 좌석 중복 예약 없이 처리할 수 있는가"입니다.  
+이를 위해 예매 과정에서 Redis 비트마스크와 Lua 스크립트로 좌석을 먼저 선점하고, 이후 DB에서 한 번 더 겹침 여부를 확인하는 방식으로 처리합니다.
 
-### Architecture Diagram
-```mermaid
-graph TD
-    User((사용자)) -->|HTTPS| Frontend[React Single Page App]
-    Frontend -->|API Call| RateLimit[Rate Limiter - Redis/Bucket4j]
-    RateLimit -->|Allow| Queue[Waiting Queue - Redis ZSet]
-    Queue -->|Enter| Controller[Spring Boot Controller]
-    
-    subgraph "Application Layer"
-        Controller --> Service[Business Service]
-        Service --> Security[Spring Security / JWT]
-    end
+구현은 Spring Boot 기반의 모듈형 모놀리식 구조로 되어 있으며, 프론트엔드는 React + Vite로 분리되어 있습니다.  
+회원 로그인, 비회원 예매, 예약 결제, 예약 조회, 관리자 통계 조회까지 기본 흐름을 한 저장소 안에서 확인할 수 있습니다.
 
-    subgraph "Data Layer"
-        Service -->|Atomic Operation| Redis[(Redis - Bitmasking / Lock)]
-        Service -->|Read/Write| MySQL[(MySQL 8.0 - Master/Slave)]
-    end
+## 문서 안내
 
-    subgraph "Messaging & Async"
-        Service -->|Produce Event| Kafka[[Apache Kafka]]
-        Kafka -->|Consume| Notification[Notification / Stats Consumer]
-    end
+- `README.md`: 프로젝트 개요와 실행 방법
+- `xrail_specification.md`: 요구사항과 설계 요약본
+- `xrail_specification.docx`: 상세 기술 명세 문서
+- `HELP.md`: Spring Initializr 기본 안내 문서
+- `frontend/README.md`: Vite 기본 템플릿 문서
+
+프로젝트를 이해하려면 `xrail_specification.md`와 실제 코드 구현을 함께 보는 편이 좋습니다.  
+문서에는 확장 방향까지 포함되어 있고, 현재 저장소에는 단일 애플리케이션 기준 구현이 우선 반영되어 있습니다.
+
+## 핵심 구현 포인트
+
+### 1. 구간 예매와 좌석 선점
+
+- 좌석 점유 정보는 Redis에 `sch:{scheduleId}:seat:{seatId}` 형태로 저장합니다.
+- 출발역과 도착역 사이 구간을 비트마스크로 계산해 겹치는 구간만 막습니다.
+- Redis Lua 스크립트로 선점한 뒤, DB에서 다시 중복 여부를 확인해 정합성을 보강합니다.
+- 예약 저장 중 예외가 나면 Redis 선점 정보를 즉시 해제합니다.
+
+### 2. 대기열과 요청 제어
+
+- Redis Sorted Set 기반 대기열 서비스가 구현되어 있습니다.
+- 인터셉터에서 예약 관련 API 진입 전에 대기열 통과 여부를 검사합니다.
+- Bucket4j와 Redisson을 이용해 IP 기준 요청 제한을 적용합니다.
+
+### 3. 예약 라이프사이클
+
+- 예약 생성 시 상태는 `PENDING`으로 저장됩니다.
+- 결제 완료 시 `PAID`로 변경됩니다.
+- 20분 동안 결제가 완료되지 않으면 스케줄러가 자동 취소합니다.
+- Redis와 DB 좌석 상태가 어긋날 경우를 대비해 재대조 스케줄러가 동작합니다.
+
+### 4. 사용자 유형
+
+- 회원은 아이디/비밀번호 로그인과 OAuth2 로그인을 사용할 수 있습니다.
+- 비회원은 이름, 전화번호, 비밀번호로 등록한 뒤 발급된 Access Code로 예약을 조회할 수 있습니다.
+- 회원가입 DTO에는 봇 입력을 막기 위한 Honeypot 필드가 포함되어 있습니다.
+
+### 5. 관리자 화면
+
+- 날짜 기준 매출과 발권 건수를 조회할 수 있습니다.
+- 스케줄 목록과 티켓 목록을 페이지 단위로 조회할 수 있습니다.
+- 회원과 비회원 정보를 하나의 화면에서 확인할 수 있도록 구성되어 있습니다.
+
+## 기술 스택
+
+### Backend
+
+- Java 21
+- Spring Boot 3.4.12
+- Spring Security
+- Spring Data JPA
+- QueryDSL
+- Redis
+- Kafka
+- Flyway 의존성 포함
+
+### Frontend
+
+- React 19
+- TypeScript
+- Vite
+- React Router
+- Axios
+
+### Infrastructure
+
+- MySQL 8
+- Redis
+- Kafka
+- Zookeeper
+- Docker Compose
+
+## 디렉터리 구조
+
+```text
+XRail/
+├─ src/main/java/com/dev/XRail
+│  ├─ common      공통 응답, 예외 처리, 인터셉터, 데이터 초기화
+│  ├─ config      보안, Kafka, QueryDSL, WebMvc 설정
+│  ├─ domain      예약, 스케줄, 역, 열차, 사용자, 대기열 도메인
+│  ├─ infra       Kafka, Redis, Rate Limit 연동
+│  └─ security    JWT, OAuth2, UserDetails 구현
+├─ src/main/resources
+│  ├─ application.yaml
+│  ├─ db/migration
+│  └─ scripts
+├─ frontend/src
+│  ├─ api
+│  ├─ components
+│  ├─ pages
+│  └─ services
+└─ docker
 ```
 
----
+## 실행 방법
 
-## 🔄 핵심 데이터 플로우 (Data Flow)
+### 사전 준비
 
-### 1. 예약 및 결제 프로세스 (Reservation Flow)
-```mermaid
-sequenceDiagram
-    participant U as User (Client)
-    participant R as Redis (Bitmask)
-    participant DB as MySQL (Main DB)
-    participant K as Kafka (Message Queue)
+- Java 21
+- Node.js 20 이상
+- Docker
 
-    U->>R: 좌석 점유 시도 (Lua Script 실행)
-    Note over R: 비트마스킹을 이용한<br/>구간 중복 체크 (Atomic)
-    R-->>U: 점유 성공 (TTL 5분 설정)
-    
-    U->>DB: 예약/티켓 정보 저장 (Transaction)
-    DB-->>U: 예약 완료 (PENDING)
-    
-    Note over U,DB: --- 결제 단계 ---
-    
-    U->>DB: 결제 승인 요청
-    DB->>DB: 예약 상태 변경 (PAID)
-    DB-->>U: 최종 완료 페이지 이동
-    
-    DB->>K: 결제 완료 이벤트 발행 (Produce)
-    K->>K: 메시지 큐 적재
-    Note right of K: 알림톡 발송 및<br/>통계 집계 (Consumer)
-```
+### 1. 인프라 실행
 
-### 2. 기술적 활용 상세
-*   **Redis (Concurrency Control):**
-    *   **Lua Script:** 좌석 조회와 점유 비트 업데이트를 하나의 원자적 단위로 묶어 다중 서버 환경에서도 동시성 문제를 해결했습니다.
-    *   **Segment Bitmasking:** 하나의 열차 좌석을 구간별(서울-대전, 대전-부산 등)로 쪼개어 비트 연산으로 관리함으로써 공간 효율성과 연산 속도를 극대화했습니다.
-*   **Apache Kafka (Asynchronous Processing):**
-    *   예약 완료나 결제와 같이 트랜잭션이 중요한 로직에서 알림 발송, 로그 수집 등 시간이 소요되는 부가 작업을 비동기로 분리하여 사용자 응답 속도를 개선했습니다.
-*   **Waiting Queue:**
-    *   접속 폭주 시 Redis의 `Sorted Set`을 사용하여 진입 순서를 보장하고, 서버가 감당 가능한 수준의 트래픽만 인스턴스에 전달되도록 제어합니다.
+필수 인프라만 먼저 올리는 방식이 가장 안전합니다.
 
----
-
-## ⚡ 핵심 기능 및 기술적 도전 (Key Features)
-
-### 1. 동시성 제어 및 데이터 무결성 (Concurrency Control)
-*   **Redis Lua Script:** 좌석 선점(Pre-booking) 시 **조회와 점유를 원자적(Atomic)으로 처리**하여 Race Condition을 원천 차단했습니다.
-*   **비트마스킹(Bitmasking) 구간 예매:** 
-    *   서울→대전(구간 A), 대전→부산(구간 B) 예매 시, 동일 좌석이라도 구간이 겹치지 않으면 중복 예약을 허용하는 효율적인 비트 연산 로직을 구현했습니다.
-*   **낙관적/비관적 락:** DB 레벨에서의 데이터 충돌을 방지하기 위해 JPA Lock을 적절히 혼합 사용했습니다.
-
-### 2. 대용량 트래픽 대응 (Traffic Management)
-*   **대기열 시스템 (Waiting Queue):** 접속 폭주 시 Redis `Sorted Set`을 활용한 대기열 토큰 발급 시스템으로 서버 부하를 일정하게 유지합니다.
-*   **Rate Limiting:** Bucket4j를 활용하여 비정상적인 매크로 및 과도한 API 호출을 차단합니다.
-
-### 3. 고도화된 예약 프로세스
-*   **실시간 매진 처리:** 특정 구간의 예매 티켓 수와 열차 정원을 실시간으로 비교하여 매진 여부를 정확히 표시합니다.
-*   **임박 열차 제한:** 출발 5분 전 열차에 대한 예약 차단 로직으로 운영 리스크를 최소화했습니다.
-*   **보안 강화:** 비회원 예매 시 `Access Code` 발급 및 비밀번호 암호화 저장, 부정 가입 방지를 위한 `Honeypot` 필드 적용.
-
-### 4. 관리자 모니터링 시스템 (Admin Dashboard)
-*   **대시보드:** 실시간 매출 및 예매 현황 시각화.
-*   **스케줄/티켓 관리:** 날짜별/노선별 필터링 및 페이징 기능을 갖춘 데이터 그리드 제공.
-*   **사용자 관리:** 회원/비회원 구분 없이 상세 정보를 조회할 수 있는 통합 뷰 제공.
-
----
-
-## 🚀 실행 방법 (Getting Started)
-
-### Prerequisites
-*   Java 21+
-*   Node.js 20+
-*   Docker (MySQL, Redis, Kafka)
-
-### 1. 인프라 실행 (Docker)
 ```bash
-docker-compose up -d
+docker-compose up -d mysql redis zookeeper kafka
 ```
 
-### 2. Backend 실행
+### 2. 백엔드 실행
+
 ```bash
 ./gradlew bootRun
 ```
-*   서버가 시작되면 `DataInitializer`가 자동으로 실행되어 초기 역, 열차, 스케줄 데이터를 생성합니다.
 
-### 3. Frontend 실행
+서버가 시작되면 `DataInitializer`가 역, 노선, 열차, 좌석, 스케줄 데이터를 자동으로 채웁니다.
+
+### 3. 프론트엔드 실행
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-*   브라우저에서 `http://localhost:5173` 접속
 
----
+- 프론트엔드: `http://localhost:5173`
+- 백엔드 API: `http://localhost:8088`
 
-## 📂 프로젝트 구조
-```
-XRail/
-├── src/main/java/com/dev/XRail
-│   ├── common       # 공통 유틸리티, 예외 처리, 초기화 로직
-│   ├── domain       # 도메인별(예약, 스케줄, 회원) 비즈니스 로직
-│   ├── infra        # Redis, Kafka, RateLimit 등 인프라 계층
-│   └── security     # JWT, OAuth2 인증/인가 설정
-├── frontend/src
-│   ├── api          # Axios API 클라이언트
-│   ├── pages        # 주요 페이지 (검색, 예약, 결제, 관리자)
-│   └── components   # 재사용 가능한 UI 컴포넌트
-└── docker           # Docker 환경 설정 파일
-```
+## 참고할 점
 
----
+- 명세 문서에는 Redis Cluster, MySQL Master/Slave, 외부 알림 같은 확장 설계가 포함되어 있습니다.
+- 현재 저장소는 로컬 개발과 기능 검증에 초점을 둔 구성입니다.
+- 대기열 API는 구현되어 있지만 프론트 화면에서는 아직 직접 연결되어 있지 않습니다.
+- Kafka 프로듀서와 컨슈머 클래스는 존재하지만, 예약 결제 흐름과의 연결은 추가 정리가 필요합니다.
 
-## 📝 회고 (Retrospective)
-이 프로젝트를 통해 대규모 트래픽 환경에서 발생할 수 있는 동시성 이슈를 깊이 있게 고민하고, Redis와 비트마스킹을 활용한 고성능 해결책을 도출했습니다. 또한, 사용자 경험(UX)을 고려한 프론트엔드 설계와 관리자 편의성을 위한 백오피스 구축까지 풀스택 개발의 전 과정을 주도적으로 수행했습니다.
+## 회고
+
+이 프로젝트는 단순한 CRUD보다 예매 도메인에서 자주 문제가 되는 동시성, 구간 계산, 임시 선점, 만료 처리 같은 주제를 다루는 데 의미가 있습니다.  
+문서와 코드를 같이 보면 설계 의도와 현재 구현 상태를 함께 파악하기 좋습니다.
